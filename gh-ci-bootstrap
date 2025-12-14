@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Org-scoped bootstrapper for Smart CI Router on self-hosted runners.
+# Intended to be published as a gh extension repo: gh-ci-bootstrap
+
+ORG="DallasCrilleyMarTech"
+WORKFLOW_REF="DallasCrilleyMarTech/.github/.github/workflows/smart-ci.yml@v3"
+
+usage() {
+  cat <<'EOF' >&2
+usage: gh ci-bootstrap [--repo <path>] [--force] [--dry-run]
+
+Scaffolds Smart CI Router into a repo (org-only).
+
+Options:
+  --repo <path>  target repo path (default: current directory)
+  --force        overwrite existing files
+  --dry-run      print actions without writing
+EOF
+}
+
+die() { echo "error: $*" >&2; exit 2; }
+log() { printf '%s\n' "$*"; }
+
+REPO_PATH=""
+FORCE=0
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo) shift; [[ $# -gt 0 ]] || die "--repo requires a path"; REPO_PATH="$1"; shift ;;
+    --force) FORCE=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+[[ -n "$REPO_PATH" ]] || REPO_PATH="."
+[[ -d "$REPO_PATH" ]] || die "repo path not found: $REPO_PATH"
+
+REPO_PATH="$(cd "$REPO_PATH" && pwd -P)"
+WORKFLOWS_DIR="$REPO_PATH/.github/workflows"
+ROUTER_FILE="$REPO_PATH/.github/ci-router.yml"
+CI_FILE="$WORKFLOWS_DIR/ci.yml"
+
+run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "DRY-RUN: $*"
+    return 0
+  fi
+  "$@"
+}
+
+write_file() {
+  local path="$1"
+  local content="$2"
+
+  if [[ -e "$path" && "$FORCE" -ne 1 ]]; then
+    log "skip (exists): ${path#$REPO_PATH/}"
+    return 0
+  fi
+
+  run mkdir -p "$(dirname "$path")"
+  log "write: ${path#$REPO_PATH/}"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return 0
+  fi
+  cat >"$path" <<<"$content"
+}
+
+assert_org_scope() {
+  if ! command -v gh >/dev/null 2>&1; then
+    log "warning: gh not found; skipping org verification"
+    return
+  fi
+
+  local repo_slug owner
+  if repo_slug=$(cd "$REPO_PATH" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null); then
+    owner=$(cd "$REPO_PATH" && gh repo view --json owner -q .owner.login 2>/dev/null || echo "")
+    if [[ "$owner" != "$ORG" ]]; then
+      die "refusing to run: repo owner '$owner' is not '$ORG'"
+    fi
+    log "target repo: $repo_slug (owner verified)"
+  else
+    die "gh repo view failed; ensure you're authenticated and inside a GitHub repo"
+  fi
+}
+
+router_template() {
+  cat <<'EOF'
+environment: image
+image: python:3.12-slim
+
+commands:
+  # Update to match your project. `ci` is invoked by the workflow below.
+  ci: |
+    pip install -q uv
+    uv pip install -r requirements.txt
+    pytest -v
+EOF
+}
+
+ci_workflow_template() {
+  cat <<EOF
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    uses: ${WORKFLOW_REF}
+    with:
+      command: ci
+    secrets: inherit
+EOF
+}
+
+main() {
+  assert_org_scope
+
+  write_file "$ROUTER_FILE" "$(router_template)"
+  write_file "$CI_FILE" "$(ci_workflow_template)"
+
+  log ""
+  log "done."
+  log "next steps:"
+  log "  - Adjust .github/ci-router.yml image/commands for your stack."
+  log "  - Push and open a PR; workflow should run on self-hosted runners."
+}
+
+main "$@"
