@@ -7,13 +7,16 @@ set -euo pipefail
 ORG="DallasCrilleyMarTech"
 REPO_NAME="${REPO_NAME:-ci-bootstrap-sandbox-$(date +%s)}"
 KEEP="${KEEP:-0}"
+DELETE="${DELETE:-1}"
 
 die() { echo "error: $*" >&2; exit 1; }
 log() { printf '%s\n' "$*"; }
 
 command -v gh >/dev/null 2>&1 || die "gh CLI required"
 gh auth status >/dev/null 2>&1 || die "gh auth required"
-command -v gh-ci-bootstrap >/dev/null 2>&1 || die "gh extension install DallasCrilleyMarTech/gh-ci-bootstrap first"
+if ! gh ci-bootstrap --help >/dev/null 2>&1; then
+  die "gh extension install DallasCrilleyMarTech/gh-ci-bootstrap first"
+fi
 
 TMPDIR="$(mktemp -d)"
 cleanup() {
@@ -49,8 +52,14 @@ git push origin main >/dev/null
 log "pushed bootstrap to $ORG/$REPO_NAME"
 
 if [[ "$KEEP" -ne 1 ]]; then
-  log "deleting remote repo $ORG/$REPO_NAME"
-  gh repo delete "$ORG/$REPO_NAME" --yes --confirm >/dev/null
+  if [[ "$DELETE" -eq 1 ]]; then
+    log "deleting remote repo $ORG/$REPO_NAME (requires delete_repo scope)"
+    if ! gh repo delete "$ORG/$REPO_NAME" --yes >/dev/null 2>&1; then
+      log "warning: failed to delete repo (likely missing delete_repo scope). Set KEEP=1 to retain."
+    fi
+  else
+    log "deletion skipped (DELETE=0)"
+  fi
 else
   log "repo retained: https://github.com/$ORG/$REPO_NAME"
 fi
