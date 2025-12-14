@@ -80,3 +80,14 @@ Branch alignment:
 gh extension install DallasCrilleyMarTech/gh-ci-bootstrap
 gh ci-bootstrap --dry-run --repo /path/to/test-repo
 ```
+
+### Sandbox script (creates temporary repo)
+
+To exercise the full flow end-to-end, use the helper script:
+```bash
+cd packages/workflow-automation/gh-ci-bootstrap
+./test-sandbox.sh            # creates repo in org, bootstraps, pushes, deletes
+KEEP=1 ./test-sandbox.sh     # keep the repo for manual inspection
+REPO_NAME=my-sandbox ./test-sandbox.sh  # override generated name
+```
+Requires `gh ci-bootstrap` extension installed and `gh` authenticated with permission to create/delete org repos.
