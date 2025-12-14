@@ -50,7 +50,8 @@ git subtree split --prefix="$SUBDIR" -b "$BRANCH" || {
 }
 
 # Push to target repo (sanitize output to avoid leaking tokens)
-push_output=$(git push "$TARGET_REPO" "$BRANCH:$TARGET_BRANCH" --force 2>&1) || {
+push_output=$(git -c http.extraheader= -c http.https://github.com/.extraheader= \
+  push "$TARGET_REPO" "$BRANCH:$TARGET_BRANCH" --force 2>&1) || {
   echo "error: git push failed" >&2
   echo "$(sanitize_remote "$push_output")" >&2
   git branch -D "$BRANCH" 2>/dev/null || true
