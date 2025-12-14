@@ -67,6 +67,13 @@ cd packages/workflow-automation/gh-ci-bootstrap
 
 Changes to this folder on `main` branch automatically trigger a GitHub Action that publishes to the extension repo.
 
+The workflow requires a PAT secret with write access to `DallasCrilleyMarTech/gh-ci-bootstrap`:
+- Org/repo secret: `GH_CI_BOOTSTRAP_PAT`
+- Scope: `repo` (or finer-grained equivalent) with permission to push to the target repo
+
+Branch alignment:
+- The subtree is pushed to the `main` branch of `DallasCrilleyMarTech/gh-ci-bootstrap`. Ensure that repo’s default branch is `main`.
+
 ### Testing after publish
 
 ```bash

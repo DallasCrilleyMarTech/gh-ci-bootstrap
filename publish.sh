@@ -9,7 +9,7 @@ SUBDIR="packages/workflow-automation/gh-ci-bootstrap"
 # Allow override via env var (useful for CI with HTTPS token)
 TARGET_REPO="${TARGET_REPO:-git@github.com:DallasCrilleyMarTech/gh-ci-bootstrap.git}"
 BRANCH="gh-ci-bootstrap-publish"
-TARGET_BRANCH="master"
+TARGET_BRANCH="main"
 
 cd "$REPO_ROOT"
 
@@ -32,7 +32,12 @@ if ! git diff-index --quiet HEAD -- "$SUBDIR"; then
   exit 1
 fi
 
-echo "Publishing $SUBDIR to $TARGET_REPO..."
+# Avoid printing tokenized URLs when using HTTPS
+if [[ "$TARGET_REPO" == https://* ]]; then
+  echo "Publishing $SUBDIR to remote (HTTPS, redacted)..."
+else
+  echo "Publishing $SUBDIR to $TARGET_REPO..."
+fi
 
 # Split subtree into temporary branch
 git subtree split --prefix="$SUBDIR" -b "$BRANCH" || {
