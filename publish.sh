@@ -39,15 +39,20 @@ else
   echo "Publishing $SUBDIR to $TARGET_REPO..."
 fi
 
+sanitize_remote() {
+  echo "$1" | sed 's#https://[^@]*@github.com#https://***@github.com#g'
+}
+
 # Split subtree into temporary branch
 git subtree split --prefix="$SUBDIR" -b "$BRANCH" || {
   echo "error: git subtree split failed" >&2
   exit 1
 }
 
-# Push to target repo
-git push "$TARGET_REPO" "$BRANCH:$TARGET_BRANCH" --force || {
+# Push to target repo (sanitize output to avoid leaking tokens)
+push_output=$(git push "$TARGET_REPO" "$BRANCH:$TARGET_BRANCH" --force 2>&1) || {
   echo "error: git push failed" >&2
+  echo "$(sanitize_remote "$push_output")" >&2
   git branch -D "$BRANCH" 2>/dev/null || true
   exit 1
 }
@@ -55,4 +60,4 @@ git push "$TARGET_REPO" "$BRANCH:$TARGET_BRANCH" --force || {
 # Clean up local branch
 git branch -D "$BRANCH" 2>/dev/null || true
 
-echo "✓ Published to $TARGET_REPO (branch: $TARGET_BRANCH)"
+echo "✓ Published to $(sanitize_remote "$TARGET_REPO") (branch: $TARGET_BRANCH)"
